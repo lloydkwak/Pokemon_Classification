@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Kaggle dataset and processed data
+PokemonData/
+dataset/
+*.zip
+
+# Model weights (prevent pushing large files)
+models/*.pth
+models/*.pt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Streamlit specific
+.streamlit/

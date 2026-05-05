@@ -10,12 +10,11 @@ import os
 import copy
 from tqdm import tqdm
 
-# Configuration and Hyperparameters
 DATA_DIR = './dataset'
 MODEL_DIR = './models'
 RESULT_DIR = './results'
 BATCH_SIZE = 32
-EPOCHS = 20
+EPOCHS = 15 
 NUM_CLASSES = 150
 
 os.makedirs(MODEL_DIR, exist_ok=True)
@@ -23,8 +22,6 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define transformations with Data Augmentation
-# Augmentation helps to achieve higher F1 scores
 data_transforms = {
     'train': transforms.Compose([
         transforms.Resize((224, 224)),
@@ -50,8 +47,11 @@ dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=BATC
 class_names = image_datasets['train'].classes
 
 def train_and_evaluate(model, criterion, optimizer, num_epochs=5):
-    # Function to train the model with progress bar and return evaluation metrics
+    # Function to train the model, return metrics, and track learning history
     best_model_wts = copy.deepcopy(model.state_dict())
+    
+    # Dictionary to store loss and accuracy history for learning curves
+    history = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
     
     for epoch in range(num_epochs):
         print(f'\nEpoch {epoch+1}/{num_epochs}')
@@ -64,8 +64,8 @@ def train_and_evaluate(model, criterion, optimizer, num_epochs=5):
                 model.eval()
 
             running_loss = 0.0
+            running_corrects = 0
             
-            # Initialize tqdm progress bar
             dataloader_iter = tqdm(dataloaders[phase], desc=f"[{phase.capitalize()}]")
             
             for inputs, labels in dataloader_iter:
@@ -84,14 +84,25 @@ def train_and_evaluate(model, criterion, optimizer, num_epochs=5):
                         optimizer.step()
                         
                 running_loss += loss.item() * inputs.size(0)
-                # Update progress bar with the current batch loss
+                running_corrects += torch.sum(preds == labels.data)
+                
                 dataloader_iter.set_postfix(loss=f"{loss.item():.4f}")
 
             epoch_loss = running_loss / len(image_datasets[phase])
-            print(f'{phase.capitalize()} Loss: {epoch_loss:.4f}')
+            epoch_acc = running_corrects.double() / len(image_datasets[phase])
+            
+            print(f'{phase.capitalize()} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+            
+            # Record metrics to history
+            if phase == 'train':
+                history['train_loss'].append(epoch_loss)
+                history['train_acc'].append(epoch_acc.item())
+            else:
+                history['val_loss'].append(epoch_loss)
+                history['val_acc'].append(epoch_acc.item())
                         
-    # Evaluation phase to calculate final metrics
-    print("\nCalculating metrics on validation set...")
+    # Evaluation phase to calculate final macro metrics
+    print("\nCalculating final macro metrics on validation set...")
     model.eval()
     all_preds = []
     all_labels = []
@@ -107,14 +118,42 @@ def train_and_evaluate(model, criterion, optimizer, num_epochs=5):
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
-    # Calculate metrics with zero_division parameter
     acc = accuracy_score(all_labels, all_preds)
     prec = precision_score(all_labels, all_preds, average='macro', zero_division=0)
     rec = recall_score(all_labels, all_preds, average='macro', zero_division=0)
     f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
     
     print(f"Result -> Acc: {acc:.4f}, Prec: {prec:.4f}, Rec: {rec:.4f}, F1: {f1:.4f}\n")
-    return acc, prec, rec, f1, copy.deepcopy(model.state_dict())
+    return acc, prec, rec, f1, copy.deepcopy(model.state_dict()), history
+
+def save_learning_curve(history, model_name):
+    # Generate and save train/val learning curve plots
+    epochs = range(1, len(history['train_loss']) + 1)
+    
+    plt.figure(figsize=(12, 5))
+    
+    # Plot Loss
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, history['train_loss'], 'b-', label='Train Loss')
+    plt.plot(epochs, history['val_loss'], 'r-', label='Validation Loss')
+    plt.title(f'{model_name} - Loss Curve')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    
+    # Plot Accuracy
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, history['train_acc'], 'b-', label='Train Accuracy')
+    plt.plot(epochs, history['val_acc'], 'r-', label='Validation Accuracy')
+    plt.title(f'{model_name} - Accuracy Curve')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    
+    plt.tight_layout()
+    plot_path = os.path.join(RESULT_DIR, f'{model_name}_learning_curve.png')
+    plt.savefig(plot_path)
+    plt.close()
 
 def get_experiment_models():
     # Setup 1: ResNet18 Feature Extractor
@@ -131,7 +170,7 @@ def get_experiment_models():
     model3 = models.mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT)
     model3.classifier[1] = nn.Linear(model3.classifier[1].in_features, NUM_CLASSES)
 
-    # Setup 4: DenseNet201 Fine-tuning (Inspired by Kaggle 90% F1 Score Reference)
+    # Setup 4: DenseNet201 Fine-tuning
     model4 = models.densenet201(weights=DenseNet201_Weights.DEFAULT)
     model4.classifier = nn.Linear(model4.classifier.in_features, NUM_CLASSES)
 
@@ -155,13 +194,17 @@ if __name__ == '__main__':
         # Only optimize parameters that require gradients
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=0.001)
         
-        acc, prec, rec, f1, best_weights = train_and_evaluate(model, criterion, optimizer, num_epochs=EPOCHS)
+        # Unpack the history variable as well
+        acc, prec, rec, f1, best_weights, history = train_and_evaluate(model, criterion, optimizer, num_epochs=EPOCHS)
         results[name] = {'Accuracy': acc, 'Precision': prec, 'Recall': rec, 'F1': f1}
         
-        # Save the best model
+        # Save the best model weights
         torch.save(best_weights, os.path.join(MODEL_DIR, f"{name}.pth"))
+        
+        # Save the learning curve plot for this specific model
+        save_learning_curve(history, name)
 
-    # Visualization
+    # Overall Metrics Visualization
     labels = list(results.keys())
     acc_vals = [results[l]['Accuracy'] for l in labels]
     prec_vals = [results[l]['Precision'] for l in labels]
@@ -185,4 +228,6 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     plt.savefig(os.path.join(RESULT_DIR, 'metrics_comparison.png'))
-    print("All experiments completed successfully. Plot saved to results folder.")
+    plt.close()
+    
+    print("All experiments completed successfully. Models and plots are saved.")

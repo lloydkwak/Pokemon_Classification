@@ -1,6 +1,6 @@
 # pokemon-classifier-transfer-learning
 
-**Description:** My Pokemon image classifier using Transfer Learning (ResNet18 and MobileNetV2) with a Streamlit GUI. 
+**Description:** My Pokemon image classifier using Transfer Learning (ResNet18, MobileNetV2, DenseNet201) with a Streamlit GUI. 
 
 ## 1. Project Overview
 This project predicts the name of a Pokemon from a given image. It utilizes a dataset of 7,000 labeled images spanning 150 Pokemon classes. The goal is to compare different transfer learning setups and deploy a simple web-based demonstration.
@@ -10,22 +10,18 @@ To evaluate the effectiveness of transfer learning, four different model configu
 * **Setup 1:** ResNet18 Feature Extractor (Pre-trained weights, frozen base layers)
 * **Setup 2:** ResNet18 Fine-tuning (Pre-trained weights, all layers trained)
 * **Setup 3:** MobileNetV2 Fine-tuning (Pre-trained weights, all layers trained)
-* **Setup 4:** ResNet18 from Scratch (No pre-trained weights)
+* **Setup 4:** DenseNet201 Fine-tuning (Pre-trained weights, all layers trained)
 
 ## 3. Performance Evaluation
-The models were evaluated using Accuracy, Precision, Recall, and F1 Score. 
 
+**Performance Chart**  
+![Performance Chart](results/metrics_comparison.png)
 
-| Model Setup | Accuracy | Precision | Recall | F1 Score |
-| :--- | :--- | :--- | :--- | :--- |
-| ResNet18 (Feature Extractor) | 0.00 | 0.00 | 0.00 | 0.00 |
-| ResNet18 (Fine-tuning) | 0.00 | 0.00 | 0.00 | 0.00 |
-| MobileNetV2 (Fine-tuning) | 0.00 | 0.00 | 0.00 | 0.00 |
-| ResNet18 (Scratch) | 0.00 | 0.00 | 0.00 | 0.00 |
-
-**Performance Chart**
-*(Upload your `metrics_comparison.png` to your repository and link it here)*
-`![Performance Chart](results/metrics_comparison.png)`
+**Learning Curves**  
+![ResNet18 Feature Extractor](results/ResNet18_FeatureExtract_learning_curve.png)  
+![ResNet18 Fine-tuning](results/ResNet18_FineTuning_learning_curve.png)  
+![MobileNetV2 Fine-tuning](results/MobileNetV2_FineTuning_learning_curve.png)  
+![DenseNet201 Fine-tuning](results/DenseNet201_FineTuning_learning_curve.png)
 
 ## 4. How to Run
 
@@ -51,7 +47,7 @@ streamlit run app.py
 ```
 
 ## 5. Demo
-[cite_start]This is a screenshot of the Streamlit GUI predicting a Pokemon from an uploaded image[cite: 42, 53].
 
-*(Upload your Streamlit screenshot to the repository and link it here)*
-`![Streamlit Demo GUI](screenshot.png)`
+
+**Demo GIF**  
+![Streamlit Demo GIF](results/demo.gif)
